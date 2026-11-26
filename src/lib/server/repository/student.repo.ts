@@ -28,6 +28,13 @@ import { BaseRepository } from "./base.repo";
 import type { Attendance } from "$lib/schema/result-input";
 import type { NewAttendance, StudentRecord } from "$lib/types/result-types";
 import { hashPwd } from "$lib/server/helpers/utils";
+import type {
+  SortDir,
+  StudentEditOptions,
+  StudentEditRow,
+  StudentRosterRow,
+  StudentStats,
+} from "$lib/server/people/people-types";
 
 export type StudentDetails = {
   studentId: number;
@@ -347,6 +354,250 @@ export class StudentRepository extends BaseRepository {
       .groupBy(smParents.id);
 
     return student || null;
+  }
+
+  async getClassRosterPage(params: {
+    schoolId: number;
+    academicId: number;
+    classId: number;
+    sectionId: number;
+    q: string;
+    sort: "name";
+    dir: SortDir;
+    page: number;
+    pageSize: number;
+  }): Promise<{ rows: StudentRosterRow[]; total: number; stats: StudentStats }> {
+    return this.withErrorHandling(async () => {
+      const { schoolId, academicId, classId, sectionId, q, dir, page, pageSize } = params;
+      const conditions = [
+        eq(studentRecords.schoolId, schoolId),
+        eq(studentRecords.academicId, academicId),
+        eq(studentRecords.classId, classId),
+        eq(studentRecords.sectionId, sectionId),
+        eq(studentRecords.isDefault, 1),
+        eq(studentRecords.activeStatus, 1),
+        eq(studentRecords.isGraduate, 0),
+      ];
+      if (q) {
+        const pattern = `%${q}%`;
+        conditions.push(
+          or(
+            like(smStudents.fullName, pattern),
+            like(smStudents.admissionNo, pattern)
+          ) as (typeof conditions)[number]
+        );
+      }
+
+      const where = and(...conditions);
+      const nameExpr = sql<string>`COALESCE(NULLIF(${smStudents.fullName}, ''), CONCAT_WS(' ', ${smStudents.firstName}, ${smStudents.lastName}))`;
+      const direction = dir === "desc" ? desc(nameExpr) : asc(nameExpr);
+
+      const rowsPromise = this.db
+        .select({
+          id: smStudents.id,
+          fullName: smStudents.fullName,
+          admissionNo: smStudents.admissionNo,
+          studentPhoto: smStudents.studentPhoto,
+          activeStatus: smStudents.activeStatus,
+          classId: studentRecords.classId,
+          className: smClasses.className,
+          sectionId: studentRecords.sectionId,
+          sectionName: smSections.sectionName,
+        })
+        .from(smStudents)
+        .innerJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
+        .leftJoin(smClasses, eq(smClasses.id, studentRecords.classId))
+        .leftJoin(smSections, eq(smSections.id, studentRecords.sectionId))
+        .where(where)
+        .orderBy(direction, asc(smStudents.id))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize);
+
+      const statsPromise = this.db
+        .select({
+          total: sql<number>`COUNT(*)`,
+          active: sql<number>`COALESCE(SUM(${smStudents.activeStatus} = 1), 0)`,
+          noAdmission: sql<number>`COALESCE(SUM(${smStudents.admissionNo} IS NULL), 0)`,
+        })
+        .from(smStudents)
+        .innerJoin(studentRecords, eq(smStudents.id, studentRecords.studentId))
+        .where(where);
+
+      const [rowsRaw, statsRows] = await Promise.all([rowsPromise, statsPromise]);
+      const statsRow = statsRows[0];
+      const total = Number(statsRow?.total ?? 0);
+      const stats: StudentStats = {
+        total,
+        active: Number(statsRow?.active ?? 0),
+        noAdmission: Number(statsRow?.noAdmission ?? 0),
+      };
+      const rows: StudentRosterRow[] = rowsRaw.map((row) => ({
+        id: row.id,
+        fullName: row.fullName,
+        admissionNo: row.admissionNo,
+        studentPhoto: row.studentPhoto,
+        classId: row.classId ?? classId,
+        className: row.className,
+        sectionId: row.sectionId ?? sectionId,
+        sectionName: row.sectionName,
+        active: row.activeStatus === 1,
+      }));
+
+      return { rows, total, stats };
+    }, "getClassRosterPage");
+  }
+
+  /**
+   * One student with the fields the `/people` edit modal exposes.
+   *
+   * Unlike `getStudentById`, this is school-scoped and does not hide inactive
+   * students, so an administrator can still open (and re-activate) a removed
+   * student from the roster. Class/section come from the default record for the
+   * active academic year.
+   */
+  async getStudentForEdit(params: {
+    studentId: number;
+    schoolId: number;
+    academicId: number;
+  }): Promise<StudentEditRow | null> {
+    const { studentId, schoolId, academicId } = params;
+    return this.withErrorHandling(async () => {
+      const [row] = await this.db
+        .select({
+          id: smStudents.id,
+          admissionNo: smStudents.admissionNo,
+          rollNo: smStudents.rollNo,
+          firstName: smStudents.firstName,
+          lastName: smStudents.lastName,
+          fullName: smStudents.fullName,
+          dateOfBirth: smStudents.dateOfBirth,
+          studentPhoto: smStudents.studentPhoto,
+          genderId: smStudents.genderId,
+          studentCategoryId: smStudents.studentCategoryId,
+          activeStatus: smStudents.activeStatus,
+          classId: studentRecords.classId,
+          className: smClasses.className,
+          sectionId: studentRecords.sectionId,
+          sectionName: smSections.sectionName,
+        })
+        .from(smStudents)
+        .leftJoin(
+          studentRecords,
+          and(
+            eq(studentRecords.studentId, smStudents.id),
+            eq(studentRecords.academicId, academicId),
+            eq(studentRecords.isDefault, 1)
+          )
+        )
+        .leftJoin(smClasses, eq(smClasses.id, studentRecords.classId))
+        .leftJoin(smSections, eq(smSections.id, studentRecords.sectionId))
+        .where(and(eq(smStudents.id, studentId), eq(smStudents.schoolId, schoolId)))
+        .limit(1);
+
+      if (!row) return null;
+      return {
+        id: row.id,
+        admissionNo: row.admissionNo,
+        rollNo: row.rollNo,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        fullName: row.fullName,
+        dateOfBirth: row.dateOfBirth,
+        studentPhoto: row.studentPhoto,
+        genderId: row.genderId,
+        studentCategoryId: row.studentCategoryId,
+        classId: row.classId,
+        className: row.className,
+        sectionId: row.sectionId,
+        sectionName: row.sectionName,
+        active: row.activeStatus === 1,
+      };
+    }, "getStudentForEdit");
+  }
+
+  /**
+   * Search existing students for the new-student modal's sibling picker.
+   *
+   * School-scoped and limited, so the picker can show `name · admission no ·
+   * class` for confirmation instead of asking an admin to type an admission
+   * number blind. The parent contact returned with each row is only used to
+   * prefill the guardian fields; linking still goes through
+   * `createStudentIfNotExists`.
+   */
+  async searchStudentsForSibling(params: {
+    schoolId: number;
+    academicId: number;
+    q: string;
+    limit?: number;
+  }): Promise<
+    {
+      id: number;
+      fullName: string | null;
+      admissionNo: number | null;
+      className: string | null;
+      sectionName: string | null;
+      guardianName: string | null;
+      guardianEmail: string | null;
+      guardianMobile: string | null;
+    }[]
+  > {
+    const { schoolId, academicId, q, limit = 10 } = params;
+    return this.withErrorHandling(async () => {
+      const pattern = `%${q}%`;
+      return await this.db
+        .select({
+          id: smStudents.id,
+          fullName: smStudents.fullName,
+          admissionNo: smStudents.admissionNo,
+          className: smClasses.className,
+          sectionName: smSections.sectionName,
+          guardianName: smParents.guardiansName,
+          guardianEmail: smParents.guardiansEmail,
+          guardianMobile: smParents.guardiansMobile,
+        })
+        .from(smStudents)
+        .innerJoin(
+          studentRecords,
+          and(
+            eq(studentRecords.studentId, smStudents.id),
+            eq(studentRecords.academicId, academicId),
+            eq(studentRecords.isDefault, 1),
+            eq(studentRecords.activeStatus, 1)
+          )
+        )
+        .leftJoin(smParents, eq(smParents.id, smStudents.parentId))
+        .leftJoin(smClasses, eq(smClasses.id, studentRecords.classId))
+        .leftJoin(smSections, eq(smSections.id, studentRecords.sectionId))
+        .where(
+          and(
+            eq(smStudents.schoolId, schoolId),
+            eq(smStudents.activeStatus, 1),
+            or(
+              like(smStudents.fullName, pattern),
+              like(smStudents.admissionNo, pattern)
+            )
+          )
+        )
+        .orderBy(asc(smStudents.fullName))
+        .limit(limit);
+    }, "searchStudentsForSibling");
+  }
+
+  /** Gender and category options for the student edit modal (2 bounded queries). */
+  async getStudentEditOptions(): Promise<StudentEditOptions> {
+    return this.withErrorHandling(async () => {
+      const [genders, categories] = await Promise.all([
+        this.db
+          .select({ id: smBaseSetups.id, name: smBaseSetups.baseSetupName })
+          .from(smBaseSetups)
+          .innerJoin(smBaseGroups, eq(smBaseSetups.baseGroupId, smBaseGroups.id))
+          .where(and(eq(smBaseSetups.activeStatus, 1), eq(smBaseGroups.name, "Gender"))),
+        this.db
+          .select({ id: smStudentCategories.id, name: smStudentCategories.categoryName })
+          .from(smStudentCategories),
+      ]);
+      return { genders, categories };
+    }, "getStudentEditOptions");
   }
 
   async getStudentsByClassSection(params: { classId: number; sectionId: number }, query?: string) {

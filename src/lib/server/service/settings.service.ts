@@ -147,6 +147,41 @@ export class SettingsService {
 		return rows[0] ?? null;
 	}
 
+	async getTeacherSelfAssignEnabled(): Promise<boolean> {
+		const db = await getDatabase();
+		const [row] = await db
+			.select({ autoApprove: smGeneralSettings.autoApprove })
+			.from(smGeneralSettings)
+			.where(eq(smGeneralSettings.schoolId, this.schoolId))
+			.limit(1);
+		return row?.autoApprove === 1;
+	}
+
+	async setTeacherSelfAssignEnabled(enabled: boolean): Promise<boolean> {
+		const db = await getDatabase();
+		const value = enabled ? 1 : 0;
+		const [result] = await db
+			.update(smGeneralSettings)
+			.set({ autoApprove: value })
+			.where(eq(smGeneralSettings.schoolId, this.schoolId));
+
+		if (Number(result?.affectedRows ?? 0) === 0) {
+			const [existing] = await db
+				.select({ id: smGeneralSettings.id })
+				.from(smGeneralSettings)
+				.where(eq(smGeneralSettings.schoolId, this.schoolId))
+				.limit(1);
+			if (!existing) {
+				await db.insert(smGeneralSettings).values({
+					schoolId: this.schoolId,
+					autoApprove: value
+				});
+			}
+		}
+
+		return enabled;
+	}
+
 	async saveGeneralSettings(
 		patch: SchoolIdentityPatch
 	): Promise<GeneralSetting | null> {

@@ -65,3 +65,6 @@ storage/edapex-mastra.db-wal
 storage/edapex-mastra.db-shm
 .cookie
 .opencode
+
+# Local agent tooling state (mirrors .kimchi/)
+.commandcode/

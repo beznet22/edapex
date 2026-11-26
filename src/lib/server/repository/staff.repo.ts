@@ -1,6 +1,6 @@
 // /src/lib/server/repository/student.repo.ts
 
-import { and, eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, like, or, sql, type SQL } from "drizzle-orm";
 import {
   infixRoles,
   smAssignSubjects,
@@ -18,6 +18,13 @@ import {
 } from "$lib/server/db/sms-schema";
 import { BaseRepository } from "./base.repo";
 import { hashPwd } from "$lib/server/helpers/utils";
+import type {
+  SortDir,
+  StaffDirectoryRow,
+  StaffSort,
+  StaffStats,
+  StaffStatus,
+} from "$lib/server/people/people-types";
 
 export type StaffDetails = {
   studentId: number;
@@ -369,6 +376,122 @@ export class StaffRepository extends BaseRepository {
         fullName: user.fullName,
       };
     }, "deleteStaff");
+  }
+
+  async listDirectory(params: {
+    schoolId: number;
+    q: string;
+    status: StaffStatus;
+    includeInactive: boolean;
+    sort: StaffSort;
+    dir: SortDir;
+    page: number;
+    pageSize: number;
+  }): Promise<{ rows: StaffDirectoryRow[]; total: number; stats: StaffStats }> {
+    return this.withErrorHandling(async () => {
+      const { schoolId, q, status, includeInactive, sort, dir, page, pageSize } = params;
+      const linkedExpr = sql<number>`(${smStaffs.userId} > 1 AND ${users.id} IS NOT NULL)`;
+      const nameExpr = sql<string>`COALESCE(NULLIF(${smStaffs.fullName}, ''), CONCAT_WS(' ', ${smStaffs.firstName}, ${smStaffs.lastName}))`;
+      const roleExpr = sql<string>`COALESCE(${smDesignations.title}, ${smHumanDepartments.name})`;
+
+      const conditions: SQL<unknown>[] = [eq(smStaffs.schoolId, schoolId)];
+      if (status === "inactive") {
+        conditions.push(eq(smStaffs.activeStatus, 0));
+      } else if (status === "active") {
+        conditions.push(eq(smStaffs.activeStatus, 1));
+      } else if (!includeInactive) {
+        conditions.push(eq(smStaffs.activeStatus, 1));
+      }
+      if (status === "no_email") {
+        conditions.push(or(isNull(smStaffs.email), eq(smStaffs.email, "")) as SQL<unknown>);
+      }
+      if (status === "linked") {
+        conditions.push(sql`(${smStaffs.userId} > 1 AND ${users.id} IS NOT NULL)`);
+      }
+      if (status === "unlinked") {
+        conditions.push(sql`NOT (${smStaffs.userId} > 1 AND ${users.id} IS NOT NULL)`);
+      }
+      if (q) {
+        const pattern = `%${q}%`;
+        conditions.push(
+          or(
+            like(smStaffs.fullName, pattern),
+            like(smStaffs.firstName, pattern),
+            like(smStaffs.lastName, pattern),
+            like(smStaffs.email, pattern),
+            like(smStaffs.mobile, pattern)
+          ) as SQL<unknown>
+        );
+      }
+
+      const where = and(...conditions);
+      const sortExpr =
+        sort === "role"
+          ? roleExpr
+          : sort === "status"
+            ? sql<number>`${smStaffs.activeStatus}`
+            : nameExpr;
+      const direction = dir === "desc" ? desc(sortExpr) : asc(sortExpr);
+
+      const rowsPromise = this.db
+        .select({
+          id: smStaffs.id,
+          fullName: smStaffs.fullName,
+          firstName: smStaffs.firstName,
+          lastName: smStaffs.lastName,
+          email: smStaffs.email,
+          mobile: smStaffs.mobile,
+          staffPhoto: smStaffs.staffPhoto,
+          userId: smStaffs.userId,
+          activeStatus: smStaffs.activeStatus,
+          designation: smDesignations.title,
+          department: smHumanDepartments.name,
+          linked: linkedExpr,
+        })
+        .from(smStaffs)
+        .leftJoin(users, eq(users.id, smStaffs.userId))
+        .leftJoin(smDesignations, eq(smDesignations.id, smStaffs.designationId))
+        .leftJoin(smHumanDepartments, eq(smHumanDepartments.id, smStaffs.departmentId))
+        .where(where)
+        .orderBy(direction, asc(smStaffs.id))
+        .limit(pageSize)
+        .offset((page - 1) * pageSize);
+
+      const statsPromise = this.db
+        .select({
+          total: sql<number>`COUNT(*)`,
+          active: sql<number>`COALESCE(SUM(${smStaffs.activeStatus} = 1), 0)`,
+          noEmail: sql<number>`COALESCE(SUM(${smStaffs.email} IS NULL OR ${smStaffs.email} = ''), 0)`,
+          linked: sql<number>`COALESCE(SUM(${linkedExpr}), 0)`,
+        })
+        .from(smStaffs)
+        .leftJoin(users, eq(users.id, smStaffs.userId))
+        .where(where);
+
+      const [rowsRaw, statsRows] = await Promise.all([rowsPromise, statsPromise]);
+      const statsRow = statsRows[0];
+      const rows: StaffDirectoryRow[] = rowsRaw.map((row) => ({
+        id: row.id,
+        fullName: row.fullName,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        email: row.email,
+        mobile: row.mobile,
+        staffPhoto: row.staffPhoto,
+        userId: row.userId,
+        active: row.activeStatus === 1,
+        linked: Number(row.linked) === 1,
+        designation: row.designation,
+        department: row.department,
+      }));
+      const stats: StaffStats = {
+        total: Number(statsRow?.total ?? 0),
+        active: Number(statsRow?.active ?? 0),
+        noEmail: Number(statsRow?.noEmail ?? 0),
+        linked: Number(statsRow?.linked ?? 0),
+      };
+      return { rows, total: stats.total, stats };
+    }, "listDirectory");
   }
 
   async getStaffByClassSection(params: { classId: number; sectionId: number }) {

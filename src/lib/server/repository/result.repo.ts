@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: <explanation> */
 import * as schema from "$lib/server/db/schema";
-import { and, avg, eq, asc, sql, inArray } from "drizzle-orm";
+import { and, avg, eq, asc, isNotNull, sql, inArray } from "drizzle-orm";
 import { BaseRepository, type MySQLDrizzleClient } from "./base.repo";
 import type { StudentDetails } from "./student.repo";
 import type {
@@ -24,6 +24,7 @@ import type {
 } from "$lib/types/result-types";
 import { jsonArrayAgg } from "../helpers";
 import type { Rating, Remark, Student, SubjectAssigned } from "$lib/schema/marksheet";
+import type { ClassOption } from "$lib/server/people/people-types";
 
 export class ResultsRepository extends BaseRepository {
   async assignSubjects(assigned: Partial<AssignedSubject>[]) {
@@ -33,9 +34,18 @@ export class ResultsRepository extends BaseRepository {
     }, "upsertAssignSubject");
   }
 
-  getClassSections(): Promise<ClassSection[]> {
+  getClassSections(options: { schoolId?: number; academicId?: number } = {}): Promise<ClassSection[]> {
     return this.withErrorHandling(async () => {
-      const academicId = await this.getAcademicId();
+      const academicId = options.academicId ?? (await this.getAcademicId());
+      const conditions = [
+        eq(schema.smClassSections.activeStatus, 1),
+        eq(schema.smClasses.activeStatus, 1),
+        eq(schema.smSections.activeStatus, 1),
+        eq(schema.smClassSections.academicId, academicId),
+      ];
+      if (options.schoolId !== undefined) {
+        conditions.push(eq(schema.smClassSections.schoolId, options.schoolId));
+      }
       return await this.db
         .select({
           id: schema.smClassSections.id,
@@ -48,14 +58,7 @@ export class ResultsRepository extends BaseRepository {
         .from(schema.smClassSections)
         .leftJoin(schema.smClasses, eq(schema.smClassSections.classId, schema.smClasses.id))
         .leftJoin(schema.smSections, eq(schema.smClassSections.sectionId, schema.smSections.id))
-        .where(
-          and(
-            eq(schema.smClassSections.activeStatus, 1),
-            eq(schema.smClasses.activeStatus, 1),
-            eq(schema.smSections.activeStatus, 1),
-            eq(schema.smClassSections.academicId, academicId)
-          )
-        )
+        .where(and(...conditions))
         .orderBy(asc(schema.smClassSections.classId));
     }, "getClassSections");
   }
@@ -163,6 +166,51 @@ export class ResultsRepository extends BaseRepository {
         .limit(1);
       return classSection as ClassSection | null;
     }, "getAssignedClassSection");
+  }
+
+  async getAssignedClassSections(params: {
+    staffId: number;
+    schoolId: number;
+    academicId: number;
+  }): Promise<ClassOption[]> {
+    return this.withErrorHandling(async () => {
+      const { staffId, schoolId, academicId } = params;
+      const rows = await this.db
+        .selectDistinct({
+          classId: schema.smAssignSubjects.classId,
+          className: schema.smClasses.className,
+          sectionId: schema.smAssignSubjects.sectionId,
+          sectionName: schema.smSections.sectionName,
+        })
+        .from(schema.smAssignSubjects)
+        .innerJoin(schema.smClasses, eq(schema.smClasses.id, schema.smAssignSubjects.classId))
+        .innerJoin(schema.smSections, eq(schema.smSections.id, schema.smAssignSubjects.sectionId))
+        .where(
+          and(
+            eq(schema.smAssignSubjects.teacherId, staffId),
+            eq(schema.smAssignSubjects.schoolId, schoolId),
+            eq(schema.smAssignSubjects.academicId, academicId),
+            eq(schema.smAssignSubjects.activeStatus, 1),
+            eq(schema.smClasses.activeStatus, 1),
+            eq(schema.smSections.activeStatus, 1),
+            isNotNull(schema.smAssignSubjects.classId),
+            isNotNull(schema.smAssignSubjects.sectionId)
+          )
+        )
+        .orderBy(asc(schema.smClasses.className), asc(schema.smSections.sectionName));
+
+      const classes: ClassOption[] = [];
+      for (const row of rows) {
+        if (row.classId === null || row.sectionId === null) continue;
+        classes.push({
+          classId: row.classId,
+          className: row.className,
+          sectionId: row.sectionId,
+          sectionName: row.sectionName,
+        });
+      }
+      return classes;
+    }, "getAssignedClassSections");
   }
 
   async upsertClassAttendance(attendance: NewAttendance, tx?: MySQLDrizzleClient) {

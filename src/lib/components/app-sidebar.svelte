@@ -33,15 +33,17 @@
 import LibraryIcon from "@lucide/svelte/icons/library";
 import PhoneIcon from "@lucide/svelte/icons/phone";
 import UsersIcon from "@lucide/svelte/icons/users";
+import ContactRoundIcon from "@lucide/svelte/icons/contact-round";
 import { goto, invalidateAll, pushState } from "$app/navigation";
   import { UserContext } from "$lib/context/user-context.svelte";
 
   type SidebarProps = {
     user?: AuthUser;
+    isUnassigned?: boolean;
     ref?: HTMLElement | null;
   } & ComponentProps<typeof Sidebar.Root>;
 
-  let { user, ref = $bindable(null), ...restProps }: SidebarProps = $props();
+  let { user, isUnassigned = false, ref = $bindable(null), ...restProps }: SidebarProps = $props();
 
   const sidebar = useSidebar();
   const userContext = UserContext.fromContext();
@@ -91,6 +93,22 @@ import { goto, invalidateAll, pushState } from "$app/navigation";
                 class="ml-auto group-data-[collapsible=icon]:hidden rounded-md bg-background/50 px-1.5 py-0.5 text-[10px] font-mono text-sidebar-foreground/40 border border-sidebar-border"
                 >⌘K</kbd
               >
+            </Sidebar.MenuButton>
+          </Sidebar.MenuItem>
+          <Sidebar.MenuItem>
+            <Sidebar.MenuButton
+              tooltipContent="People"
+              onclick={() => {
+                sidebar.setOpenMobile(false);
+                goto("/people");
+              }}
+              class="text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors font-medium"
+            >
+              <ContactRoundIcon class="size-4 text-primary" />
+              <span>People</span>
+              {#if isUnassigned}
+                <Sidebar.MenuBadge class="bg-primary/15 text-primary">Setup</Sidebar.MenuBadge>
+              {/if}
             </Sidebar.MenuButton>
           </Sidebar.MenuItem>
           <Sidebar.MenuItem>

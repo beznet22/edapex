@@ -9110,6 +9110,10 @@ export const teacherRemarks = mysqlTable(
   {
     id: int().autoincrement().primaryKey().notNull(),
     remark: text().default(sql`NULL`),
+    // Draft/scan envelope for the PWA document scanner. `remark` stays a real teacher remark;
+    // this column is never read by the report/PDF/parent paths. DDL lives in
+    // scripts/sql/2026_11_24_teacher_remarks_metadata.sql.
+    metadata: longtext("metadata").default(sql`NULL`),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow().onUpdateNow(),
     teacherId: int("teacher_id")

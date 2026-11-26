@@ -24,11 +24,26 @@ import { getMemory, mastra } from "$lib/server/mastra";
 import type { StorageThreadType } from "@mastra/core/memory";
 import { createAssessmentServiceForRequest } from "$lib/server/service/assessment.service";
 import { createTenantContext, resolveExamTypeId } from "$lib/server/mastra/tenant-context";
+import { resolveBootstrapDecision } from "./people-bootstrap";
 
 export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
   const { user, session } = locals;
   if ((!user || !session) && !allowAnonymousChats) {
     redirect(302, "/signin");
+  }
+
+  // ─── Unassigned bootstrap ────────────────────────────────────────────────
+  // Staff with no active subject assignment can use nothing else in the app,
+  // so `/` and `/chat*` send them to `/people` to self-assign or read the
+  // admin instruction. `/people` is exempt (no loop), admin/IT are never
+  // redirected, and a school without an active year redirects nobody.
+  // The decision is DB-based; the `selected-class` cookie is not consulted.
+  const bootstrap = user
+    ? await resolveBootstrapDecision({ user, pathname: url.pathname })
+    : { isUnassigned: false, redirectToPeople: false, hasActiveYear: false };
+  const isUnassigned = bootstrap.isUnassigned;
+  if (bootstrap.redirectToPeople) {
+    redirect(302, "/people?onboarding=1");
   }
 
   const sidebarCookie = cookies.get("sidebar:state");
@@ -110,8 +125,22 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
       )
     : null;
   if (user && assessment) {
-    classes = await assessment.getClassSections();
-    students = await assessment.getStudentsByStaffId(user?.staffId);
+    // `getClassSections`/`getStudentsByStaffId` throw when the school has no
+    // active academic year. `/people` must still render in that state (it is
+    // the bootstrap surface), so degrade to empty class data instead of
+    // failing the whole `(chat)` layout.
+    try {
+      classes = await assessment.getClassSections();
+    } catch (err) {
+      console.warn("[layout] class sections unavailable:", err);
+      classes = [];
+    }
+    try {
+      students = await assessment.getStudentsByStaffId(user?.staffId);
+    } catch (err) {
+      console.warn("[layout] class students unavailable:", err);
+      students = null;
+    }
 
     // Load chat history from Mastra memory for the sidebar
     try {
@@ -162,8 +191,16 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
 
   let assignedSection: ClassSection | null = null;
   if (user?.designation === "class_teacher" && assessment) {
-    // Slice 13c: per-request provider (built above)
-    assignedSection = (await assessment.getAssignedClassSection({ staffId: user.staffId || 1 })) as ClassSection | null;
+    // Slice 13c: per-request provider (built above). Also year-dependent, so
+    // an unconfigured academic year must not break the layout.
+    try {
+      assignedSection = (await assessment.getAssignedClassSection({
+        staffId: user.staffId || 1,
+      })) as ClassSection | null;
+    } catch (err) {
+      console.warn("[layout] assigned class unavailable:", err);
+      assignedSection = null;
+    }
     if (assignedSection && !token) {
       token = `${assignedSection.className}(${assignedSection.sectionName})`
         .toLowerCase()
@@ -299,6 +336,7 @@ export const load: LayoutServerLoad = async ({ cookies, locals, url }) => {
     classes,
     chats,
     sidebarCollapsed,
+    isUnassigned,
     modelId,
     resolvedModel,
     selectedClassRaw,

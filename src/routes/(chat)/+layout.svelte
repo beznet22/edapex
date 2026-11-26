@@ -116,7 +116,7 @@
 </svelte:head>
 
 <Sidebar.Provider bind:open={sidebarOpen}>
-  <AppSidebar user={data.user ?? undefined} />
+  <AppSidebar user={data.user ?? undefined} isUnassigned={data.isUnassigned ?? false} />
   <Sidebar.Inset
     class={isChatRoute ? "min-h-0 overflow-hidden" : "min-h-0 overflow-y-auto"}
   >

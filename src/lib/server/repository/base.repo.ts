@@ -215,10 +215,17 @@ export class BaseRepository {
   /**
    * Wrap async operations with consistent error handling
    */
-  protected async withErrorHandling<T>(operation: () => Promise<T>, context: string): Promise<T> {
+  protected async withErrorHandling<T>(
+    operation: () => Promise<T>,
+    context: string,
+    options?: { passThrough?: (error: unknown) => boolean }
+  ): Promise<T> {
     try {
       return await operation();
     } catch (error) {
+      if (options?.passThrough?.(error)) {
+        throw error;
+      }
       console.error(`Failed to ${context}`, error);
       throw new DbInternalError({ cause: error });
     }

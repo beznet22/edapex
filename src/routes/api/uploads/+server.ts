@@ -1,6 +1,6 @@
 import { STATIC_DIR } from "$lib/constants";
-import { eq } from "drizzle-orm";
-import { smGeneralSettings, smStudents } from "$lib/server/db/sms-schema";
+import { and, eq } from "drizzle-orm";
+import { smGeneralSettings, smStaffs, smStudents } from "$lib/server/db/sms-schema";
 import { getDatabase } from "$lib/server/db";
 import { createTenantContext } from "$lib/server/mastra/tenant-context";
 import { OcrWorkspaceStore } from "$lib/server/mastra/storage/ocr/ocr-workspace-store";
@@ -11,6 +11,7 @@ import { resolveTenantWorkspace } from "$lib/server/workspace/scope";
 import { mistralOcrService } from "$lib/server/service/mistral-ocr.service";
 import { getAppDb } from "$lib/server/mastra/storage/libsql/app-db";
 import { ResultsRepository } from "$lib/server/repository";
+import { checkStaffPhoto } from "$lib/server/people/staff-photo";
 import { ScopedRepositoryProvider } from "$lib/server/mastra/scoped-repository";
 import { buildWorkspaceRequestContext, resolveWorkspaceContext } from "$lib/server/helpers/chat-helper";
 import { log } from "$lib/server/audit-log";
@@ -20,7 +21,7 @@ import { mkdirSync, writeFileSync } from "fs";
 import { createHash, randomUUID } from "crypto";
 import { join } from "path";
 
-type UploadKind = "document" | "photo" | "studentPhoto" | "logo";
+type UploadKind = "document" | "photo" | "studentPhoto" | "staffPhoto" | "logo";
 
 function getFormString(formData: FormData, key: string): string | null {
   const value = formData.get(key);
@@ -40,7 +41,14 @@ function getFormFile(formData: FormData, key: string): File | null {
 }
 
 function normalizeKind(raw: string | null): UploadKind {
-  if (raw === "photo" || raw === "studentPhoto" || raw === "logo") return raw;
+  if (
+    raw === "photo" ||
+    raw === "studentPhoto" ||
+    raw === "staffPhoto" ||
+    raw === "logo"
+  ) {
+    return raw;
+  }
   return "document";
 }
 
@@ -48,7 +56,11 @@ function normalizeKind(raw: string | null): UploadKind {
 // uploads that mutate school-wide config. Logos are a PlatformTab mutation,
 // so only admin/IT staff may upload them.
 function isAdminOrIt(user: NonNullable<App.Locals["user"]>): boolean {
-  return user.isAdministrator === true || user.designation === "it";
+  return (
+    user.isAdministrator === true ||
+    user.designation === "it" ||
+    user.designation === "admin"
+  );
 }
 
 const STRUCTURED_OCR_SCHEMA: Record<string, unknown> = {
@@ -105,6 +117,36 @@ export const POST: RequestHandler = async ({ request, locals, cookies }) => {
   const buffer = Buffer.from(await file.arrayBuffer());
   const contentHash = createHash("sha256").update(buffer).digest("hex");
   const ext = filename.split(".").pop() ?? "bin";
+
+  if (kind === "staffPhoto") {
+    if (!isAdminOrIt(user)) error(403, "Staff photo upload requires admin or IT role");
+    const staffId = getFormNumber(formData, "staffId");
+    if (!staffId) error(400, "staffId required for staffPhoto kind");
+
+    const check = checkStaffPhoto(file.type, file.size);
+    if (!check.ok) error(400, check.error);
+    const ext = check.extension;
+
+    const uploadSchoolId = user.schoolId ?? 1;
+    const [staff] = await db
+      .select({ id: smStaffs.id, schoolId: smStaffs.schoolId })
+      .from(smStaffs)
+      .where(and(eq(smStaffs.id, staffId), eq(smStaffs.schoolId, uploadSchoolId)))
+      .limit(1);
+    if (!staff) error(404, "Staff not found in this school");
+
+    const relativePath = `uploads/staff/${contentHash}.${ext}`;
+    const fullPath = join(STATIC_DIR, relativePath);
+    mkdirSync(join(STATIC_DIR, "uploads/staff"), { recursive: true });
+    writeFileSync(fullPath, buffer);
+    const photoUrl = `/${relativePath}`;
+    await db.update(smStaffs).set({ staffPhoto: photoUrl }).where(eq(smStaffs.id, staffId));
+    return json({
+      success: true,
+      kind: "staffPhoto" as const,
+      photoUrl,
+    });
+  }
 
   if (kind === "studentPhoto") {
     if (!studentId) error(400, "studentId required for studentPhoto kind");
