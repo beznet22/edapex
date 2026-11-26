@@ -163,7 +163,7 @@
   <div class="relative flex min-h-0 flex-1 items-center justify-center px-6 py-4">
     <div
       class={cn(
-        "aspect-[1/1.414] max-h-[52vh] w-auto max-w-full rounded-md border-2 transition-colors sm:max-h-[62vh]",
+        "aspect-[1/1.414] h-[52vh] max-h-full w-auto max-w-full rounded-md border-2 transition-colors sm:h-[62vh]",
         guideTone
       )}
     ></div>
